@@ -1360,8 +1360,8 @@ void dvbapi_start_filter(int32_t demux_id, int32_t pidindex, uint16_t pid, uint1
 
 	filter[0] = table;
 	filter[16] = mask;
-
-	cs_log_dbg(D_DVBAPI, "Demuxer %d try to start new filter for caid: %04X, provid: %06X, pid: %04X", demux_id, caid, provid, pid);
+	const char *filtertypes[]={"ecm","emm","sdt","pat","pmt"};
+	cs_log_dbg(D_DVBAPI, "Demuxer %d try to start new filter for caid: %04X, provid: %06X, pid: %04X type:%s", demux_id, caid, provid, pid, filtertypes[type]);
 	dvbapi_set_filter(demux_id, selected_api, pid, caid, provid, filter, filter + 16, timeout, pidindex, type, 0);
 }
 
@@ -3297,7 +3297,9 @@ int32_t dvbapi_parse_capmt(unsigned char *buffer, uint32_t length, int32_t connf
 	uint32_t ca_mask;
 	uint32_t program_number, program_info_length;
 	uint8_t program_info_start = is_real_pmt ? 12 : 6;
-		
+
+	cs_log_dbg(D_DVBAPI,"#########DEBUG: function:%s  line=%d",__FUNCTION__,__LINE__);
+
 	if(!is_real_pmt)
 	{
 
@@ -3408,6 +3410,7 @@ int32_t dvbapi_parse_capmt(unsigned char *buffer, uint32_t length, int32_t connf
 					// free demuxer found, start pat/pmt filter for this new demuxer
 					if(pmtpid)
 					{
+						cs_log_dbg(D_DVBAPI,"#######DEBUG: function=%s line=%d",__FUNCTION__,__LINE__);
 						dvbapi_start_pmt_filter(demux_id, pmtpid);
 					}
 					else
@@ -3430,8 +3433,9 @@ int32_t dvbapi_parse_capmt(unsigned char *buffer, uint32_t length, int32_t connf
 	else // is_real_pmt
 	{
 		demux_id = existing_demux_id;
-		
+		cs_log_dbg(D_DVBAPI,"#########DEBUG: function:%s  line=%d",__FUNCTION__,__LINE__);
 		dvbapi_stop_filter(demux_id, TYPE_PMT);
+		cs_log_dbg(D_DVBAPI,"#########DEBUG: function:%s  line=%d", __FUNCTION__,__LINE__);
 		
 		program_number = b2i(2, buffer + 3);
 		program_info_length = b2i(2, buffer + 10) &0xFFF;
@@ -3708,6 +3712,7 @@ int32_t dvbapi_parse_capmt(unsigned char *buffer, uint32_t length, int32_t connf
 			}
 		}
 	}
+	cs_log_dbg(D_DVBAPI,"#########DEBUG: function:%s  line=%d",__FUNCTION__,__LINE__);
 	return demux_id;
 }
 
@@ -5480,7 +5485,7 @@ static void *dvbapi_main_local(void *cli)
 			}
 			if(ecmcounter != demux[i].old_ecmfiltercount || emmcounter != demux[i].old_emmfiltercount)   // only produce log if something changed
 			{
-				cs_log_dbg(D_DVBAPI, "Demuxer %d has %d ecmpids, %d streampids, %d ecmfilters and %d of max %d emmfilters", i, demux[i].ECMpidcount,
+				cs_log_dbg(D_DVBAPI, "Line:%d Demuxer %d has %d ecmpids, %d streampids, %d ecmfilters and %d of max %d emmfilters",__LINE__, i, demux[i].ECMpidcount,
 							  demux[i].STREAMpidcount, ecmcounter, emmcounter, demux[i].max_emm_filter);
 				demux[i].old_ecmfiltercount = ecmcounter; // save new amount of ecmfilters
 				demux[i].old_emmfiltercount = emmcounter; // save new amount of emmfilters
@@ -5610,11 +5615,13 @@ static void *dvbapi_main_local(void *cli)
 						gone = comp_timeb(&demux[i].decend, &demux[i].decstart);
 						cs_log("Demuxer %d restarting decodingrequests after %"PRId64" ms with %d enabled and %d disabled ecmpids!", i, gone, number_of_enabled_pids,
 							(demux[i].ECMpidcount-number_of_enabled_pids));
+						cs_log("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
 						dvbapi_try_next_caid(i, 0);
 					}
 				}
 			}
 
+			cs_log_dbg(D_DVBAPI,"#########DEBUG: function:%s  line=%d, demux[%d].socket_fd=%d, pmt_mode=%d,pfdcount=%d",__FUNCTION__,__LINE__,i,demux[i].socket_fd,cfg.dvbapi_pmtmode,pfdcount);
 			if(demux[i].socket_fd > 0 && cfg.dvbapi_pmtmode != 6)
 			{
 				rc = 0;
@@ -5635,6 +5642,7 @@ static void *dvbapi_main_local(void *cli)
 			}
 		}
 
+		cs_log_dbg(D_DVBAPI,"#########DEBUG: function:%s  line=%d, listenfd=%d, pmt_mode=%d,pfdcount=%d",__FUNCTION__,__LINE__,listenfd,cfg.dvbapi_pmtmode,pfdcount);
 		rc = 0;
 		while(!(listenfd == -1 && cfg.dvbapi_pmtmode == 6))
 		{
@@ -5670,6 +5678,10 @@ static void *dvbapi_main_local(void *cli)
 			if(pfd2[i].revents == 0) { continue; }  // skip sockets with no changes
 			rc--; //event handled!
 			cs_log_dbg(D_TRACE, "Now handling fd %d that reported event %d", pfd2[i].fd, pfd2[i].revents);
+			cs_log_dbg(D_DVBAPI, "Now handling fd %d that reported event %d, type[%d]=%d", pfd2[i].fd, pfd2[i].revents,i,type[i]);
+
+			if(pfd2[i].revents & POLLERR)
+				cs_log("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
 			if(pfd2[i].revents & (POLLHUP | POLLNVAL | POLLERR))
 			{
@@ -5679,6 +5691,7 @@ static void *dvbapi_main_local(void *cli)
 					{
 						if(demux[j].socket_fd == pfd2[i].fd)  // if listenfd closes stop all assigned decoding!
 						{
+							cs_log_dbg(D_DVBAPI,"#########DEBUG: function:%s  line=%d",__FUNCTION__,__LINE__);
 							dvbapi_stop_descrambling(j);
 						}
 						
@@ -5701,7 +5714,8 @@ static void *dvbapi_main_local(void *cli)
 				{
 					int32_t demux_index = ids[i];
 					int32_t n = fdn[i];
-					
+					cs_log_dbg(D_DVBAPI,"#########DEBUG: function:%s  line=%d",__FUNCTION__,__LINE__);
+
 					if(cfg.dvbapi_boxtype != BOXTYPE_SAMYGO)
 					{
 						dvbapi_stop_filternum(demux_index, n); // stop filter since its giving errors and wont return anything good.
@@ -5743,6 +5757,7 @@ static void *dvbapi_main_local(void *cli)
 				}
 				continue; // continue with other events
 			}
+			cs_log_dbg(D_DVBAPI,"#########DEBUG: function:%s  line=%d",__FUNCTION__,__LINE__);
 
 			if(pfd2[i].revents & (POLLIN | POLLPRI))
 			{
