@@ -1361,7 +1361,7 @@ void dvbapi_start_filter(int32_t demux_id, int32_t pidindex, uint16_t pid, uint1
 	filter[0] = table;
 	filter[16] = mask;
 	const char *filtertypes[]={"ecm","emm","sdt","pat","pmt"};
-	cs_log_dbg(D_DVBAPI, "Demuxer %d try to start new filter for caid: %04X, provid: %06X, pid: %04X type:%s", demux_id, caid, provid, pid, filtertypes[type]);
+	cs_log_dbg(D_DVBAPI, "Demuxer %d try to start new filter for caid: %04X, provid: %06X, pid: %04X type:%s", demux_id, caid, provid, pid, filtertypes[type - 1]);
 	dvbapi_set_filter(demux_id, selected_api, pid, caid, provid, filter, filter + 16, timeout, pidindex, type, 0);
 }
 
